@@ -1,35 +1,42 @@
-# Vue + VitePlus 项目
+# ./
 
-## 第一次使用
+This template should help get you started developing with Vue 3 in Vite.
 
-请先在本地计算机安装 Vite Plus。Vite Plus 是由 VoidZero 公司开发的 Vite 的生态增强版：
+## Recommended IDE Setup
 
-### macOS / Linux
+[VS Code](https://code.visualstudio.com/) + [Vue (Official)](https://marketplace.visualstudio.com/items?itemName=Vue.volar) (and disable Vetur).
 
-```bash
-curl -fsSL https://vite.plus | bash
+## Recommended Browser Setup
+
+- Chromium-based browsers (Chrome, Edge, Brave, etc.):
+  - [Vue.js devtools](https://chromewebstore.google.com/detail/vuejs-devtools/nhdogjmejiglipccpnnnanhbledajbpd)
+  - [Turn on Custom Object Formatter in Chrome DevTools](http://bit.ly/object-formatters)
+- Firefox:
+  - [Vue.js devtools](https://addons.mozilla.org/en-US/firefox/addon/vue-js-devtools/)
+  - [Turn on Custom Object Formatter in Firefox DevTools](https://fxdx.dev/firefox-devtools-custom-object-formatters/)
+
+## Type Support for `.vue` Imports in TS
+
+TypeScript cannot handle type information for `.vue` imports by default, so we replace the `tsc` CLI with `vue-tsc` for type checking. In editors, we need [Volar](https://marketplace.visualstudio.com/items?itemName=Vue.volar) to make the TypeScript language service aware of `.vue` types.
+
+## Customize configuration
+
+See [Vite Configuration Reference](https://vite.dev/config/).
+
+## Project Setup
+
+```sh
+pnpm install
 ```
 
-### Windows
+### Compile and Hot-Reload for Development
 
-```powershell
-irm https://vite.plus/ps1 | iex
+```sh
+pnpm dev
 ```
 
-然后在该项目根目录运行以下命令以安装依赖：
+### Type-Check, Compile and Minify for Production
 
-```bash
-vp install
-```
-
-## 运行项目
-
-```bash
-vp dev
-```
-
-## 构建项目
-
-```bash
-vp build
+```sh
+pnpm build
 ```
