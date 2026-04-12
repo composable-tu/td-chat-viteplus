@@ -34,9 +34,15 @@ importers:
       '@tdesign-vue-next/chat':
         specifier: ^0.5.2
         version: 0.5.2(omi@7.7.13)(vue@3.6.0-beta.9(typescript@6.0.2))
+      alova:
+        specifier: ^3.5.1
+        version: 3.5.1
       pinia:
         specifier: ^3.0.4
         version: 3.0.4(typescript@6.0.2)(vue@3.6.0-beta.9(typescript@6.0.2))
+      tdesign-icons-vue-next:
+        specifier: ^0.4.4
+        version: 0.4.4(vue@3.6.0-beta.9(typescript@6.0.2))
       tdesign-vue-next:
         specifier: ^1.19.0
         version: 1.19.0(vue@3.6.0-beta.9(typescript@6.0.2))
@@ -79,6 +85,9 @@ importers:
         version: 3.2.6(typescript@6.0.2)
 
 packages:
+
+  '@alova/shared@1.3.2':
+    resolution: {integrity: sha512-1XvDLWgYpVZ99MmLl1f3Fw4T6S6pPYk5afz5cwRVjuq8JXEGsDn9IygDKfvRyWqkqCBx7Jif07LIct1O+MVEow==}
 
   '@babel/code-frame@7.29.0':
     resolution: {integrity: sha512-9NhCeYjq9+3uxgdtp20LSiJXJvN0FeCtNGpJxuMFZ1Kv3cWUNb6DOhJwUvcVCzKGR66cw4njwM6hrJLqgOwbcw==}
@@ -863,6 +872,10 @@ packages:
 
   alien-signals@3.1.2:
     resolution: {integrity: sha512-d9dYqZTS90WLiU0I5c6DHj/HcKkF8ZyGN3G5x8wSbslulz70KOxaqCT0hQCo9KOyhVqzqGojvNdJXoTumZOtcw==}
+
+  alova@3.5.1:
+    resolution: {integrity: sha512-avrWPyFFWW51YLoy0S3OleNw1BV0GqNI+DSdWHfFbAoKZp80cXCCc7OtjA6OWeyhCOMglUMwo9O8j5huwnzFtQ==}
+    engines: {node: '>= 18.0.0'}
 
   ansi-styles@6.2.3:
     resolution: {integrity: sha512-4Dj6M28JB+oAH8kFkTLUo+a2jwOFkuqb3yucU0CANcRRUbxS0cP0nZYCGjcc3BNXwRIsUVmDGgzawme7zvJHvg==}
@@ -1701,6 +1714,9 @@ packages:
   querystringify@2.2.0:
     resolution: {integrity: sha512-FIqgj2EUvTa7R50u0rGsyTftzjYmv/a3hO345bZNrqabNqjtgiDMgmo4mkUjd+nzU5oF3dClKqFIPUKybUyqoQ==}
 
+  rate-limiter-flexible@5.0.5:
+    resolution: {integrity: sha512-+/dSQfo+3FYwYygUs/V2BBdwGa9nFtakDwKt4l0bnvNB53TNT++QSFewwHX9qXrZJuMe9j+TUaU21lm5ARgqdQ==}
+
   reactive-signal@2.0.1:
     resolution: {integrity: sha512-c+avHi2L+sHn9kkEsDZskRGtkfj6PtoTn1wGgutY2NZR9jCI0InXY7zqWbUXz6cGcuIXKMkQq/mtUiUXBFmKVA==}
 
@@ -2043,6 +2059,8 @@ packages:
     resolution: {integrity: sha512-gzUt/qt81nXsFGKIFcC3YnfEAx5NkunCfnDlvuBSSFS02bcXu4Lmea0AFIUwbLWxWPx3d9p8S5QoaujKcNQxcQ==}
 
 snapshots:
+
+  '@alova/shared@1.3.2': {}
 
   '@babel/code-frame@7.29.0':
     dependencies:
@@ -2738,6 +2756,11 @@ snapshots:
       - supports-color
 
   alien-signals@3.1.2: {}
+
+  alova@3.5.1:
+    dependencies:
+      '@alova/shared': 1.3.2
+      rate-limiter-flexible: 5.0.5
 
   ansi-styles@6.2.3: {}
 
@@ -3639,6 +3662,8 @@ snapshots:
   quansync@0.2.11: {}
 
   querystringify@2.2.0: {}
+
+  rate-limiter-flexible@5.0.5: {}
 
   reactive-signal@2.0.1: {}
 
