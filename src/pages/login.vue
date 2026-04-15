@@ -4,8 +4,9 @@ import type { FormProps } from "tdesign-vue-next";
 import { MessagePlugin } from "tdesign-vue-next";
 import { DesktopIcon, LockOnIcon } from "tdesign-icons-vue-next";
 import { useRequest } from "alova/client";
-import { loginApi, signupApi } from "@/api/auth.ts";
+import { loginApi, type LoginResponse, signupApi } from "@/api/auth.ts";
 import { useAccountStore } from "@/stores/account.ts";
+import type { BaseResponse } from "@/api";
 
 const accountStore = useAccountStore();
 const formType = ref("login");
@@ -33,12 +34,16 @@ const onSubmit: FormProps["onSubmit"] = async ({ validateResult, firstError }) =
         });
         MessagePlugin.success("注册成功");
       } else {
-        const res = await sendLogin({
+        const res: BaseResponse<LoginResponse> = await sendLogin({
           account: formData.account,
           password: formData.password,
         });
-        accountStore.setToken(res.token);
-        MessagePlugin.success("登录成功");
+        if (res.data) {
+          accountStore.setToken(res.data.token);
+          MessagePlugin.success("登录成功");
+        } else {
+          MessagePlugin.error("登录失败");
+        }
       }
     } else {
       console.log("Validate Errors: ", firstError, validateResult);

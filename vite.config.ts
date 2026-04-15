@@ -18,4 +18,14 @@ export default defineConfig({
       "@": fileURLToPath(new URL("./src", import.meta.url)),
     },
   },
+  server: {
+    proxy: {
+      // 当你请求 /api/login 时，Vite 会帮你转发到 http://localhost:8080/login
+      "/api": {
+        target: "http://localhost:8080",
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api/, ""), // 移除路径中的 /api 前缀
+      },
+    },
+  },
 });
