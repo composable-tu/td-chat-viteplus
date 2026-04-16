@@ -26,7 +26,7 @@ export const alovaInstance = createAlova({
 });
 
 export interface BaseResponse<T = any> {
-  code: number;
+  status: number;
   message: string;
   data?: T;
 }

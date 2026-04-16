@@ -47,7 +47,7 @@ const openUploadResumeDrawer = () => {
 };
 
 const onClickUpload = () => {
-  console.log("upload");
+  uploadResumeVisible.value = false;
 };
 
 const files = ref<UploadProps["value"]>([]);
@@ -114,7 +114,7 @@ const uploadResumeRequest = async (files: UploadFile[]): Promise<RequestMethodRe
     v-model:visible="uploadResumeVisible"
     :close-btn="true"
     :on-confirm="onClickUpload"
-    confirmBtn="上传"
+    confirmBtn="确定"
     size="large"
   >
     <template #header>上传简历</template>
