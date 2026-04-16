@@ -1,9 +1,16 @@
 <script lang="ts" setup>
 import { RouterView, useRoute, useRouter } from "vue-router";
-import { type DropdownProps, type HeadMenuProps, type UploadProps } from "tdesign-vue-next";
+import {
+  type DropdownProps,
+  type HeadMenuProps,
+  type RequestMethodResponse,
+  type UploadFile,
+  type UploadProps,
+} from "tdesign-vue-next";
 import { ref } from "vue";
 import { useAccountStore } from "@/stores/account.ts";
 import { CloudUploadIcon } from "tdesign-icons-vue-next";
+import { uploadResumeApi } from "@/api/upload.ts";
 
 const router = useRouter();
 const route = useRoute();
@@ -44,7 +51,33 @@ const onClickUpload = () => {
 };
 
 const files = ref<UploadProps["value"]>([]);
-const uploadResumeRequest = 1; // TODO: 待完善
+const uploadResumeRequest = async (files: UploadFile[]): Promise<RequestMethodResponse> => {
+  try {
+    const file = files[0];
+    console.log(file);
+    if (!file || !file.raw || !file.name) {
+      return {
+        status: "fail",
+        error: "文件不存在",
+        response: {},
+      };
+    }
+
+    const response = await uploadResumeApi(file.raw, file.name);
+    return {
+      status: "success",
+      response: {
+        message: response.message,
+      },
+    };
+  } catch (error: any) {
+    return {
+      status: "fail",
+      error: error.message || "上传失败",
+      response: {},
+    };
+  }
+};
 </script>
 
 <template>

@@ -7,7 +7,9 @@ import { useRequest } from "alova/client";
 import { loginApi, type LoginResponse, signupApi } from "@/api/auth.ts";
 import { useAccountStore } from "@/stores/account.ts";
 import type { BaseResponse } from "@/api";
+import { useRouter } from "vue-router";
 
+const router = useRouter();
 const accountStore = useAccountStore();
 const formType = ref("login");
 
@@ -41,6 +43,7 @@ const onSubmit: FormProps["onSubmit"] = async ({ validateResult, firstError }) =
         if (res.data) {
           accountStore.setToken(res.data.token);
           MessagePlugin.success("登录成功");
+          router.push("/");
         } else {
           MessagePlugin.error("登录失败");
         }
