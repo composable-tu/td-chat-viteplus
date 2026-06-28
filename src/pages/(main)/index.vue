@@ -1,5 +1,6 @@
 <script lang="ts" setup>
 import { onMounted, ref, watch } from "vue";
+import { useRoute, useRouter } from "vue-router";
 import { ChatAddIcon, RefreshIcon } from "tdesign-icons-vue-next";
 import { MessagePlugin } from "tdesign-vue-next";
 import {
@@ -10,8 +11,11 @@ import {
 } from "@/api/interview";
 import { getResumeListApi, type ResumeOption } from "@/api/resume.ts";
 
+const route = useRoute();
+const router = useRouter();
+
 const threads = ref<InterviewThread[]>([]);
-const activeThreadId = ref("");
+const activeThreadId = ref((route.query.chatId as string) || "");
 const threadsLoading = ref(false);
 
 const createNewChatVisible = ref(false);
@@ -55,7 +59,7 @@ const handleCreateChat = async () => {
     const res = await chatFirstApi(formData.value);
     MessagePlugin.success("新建成功");
     createNewChatVisible.value = false;
-    console.log(res);
+    activeThreadId.value = res.data.thread_id;
   } catch (e: any) {
     MessagePlugin.error(e.message || "新建失败");
   } finally {
@@ -87,6 +91,21 @@ const formatTime = (dateStr: string) => {
   return `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 };
 
+// 对话线程 ID 映射到网址栏
+watch(activeThreadId, (id) => {
+  const query = id ? { chatId: id } : {};
+  router.replace({ query });
+});
+
+watch(
+  () => route.query.chatId,
+  (chatId) => {
+    if (chatId && chatId !== activeThreadId.value) {
+      activeThreadId.value = chatId as string;
+    }
+  },
+);
+
 onMounted(() => {
   fetchThreads();
 });
@@ -105,13 +124,14 @@ onMounted(() => {
               新建
             </t-button>
             <t-button
-              :loading="threadsLoading"
               :disabled="threadsLoading"
+              :loading="threadsLoading"
               shape="square"
+              theme="primary"
               variant="outline"
               @click="fetchThreads"
             >
-              <template #icon v-if="!threadsLoading">
+              <template v-if="!threadsLoading" #icon>
                 <refresh-icon />
               </template>
             </t-button>
@@ -135,9 +155,9 @@ onMounted(() => {
   <t-dialog
     v-model:visible="createNewChatVisible"
     :close-on-overlay-click="!chatCreating"
+    :confirmLoading="chatCreating"
     :on-close="handleDialogClose"
     :on-confirm="handleCreateChat"
-    :confirmLoading="chatCreating"
     header="新建模拟面试"
   >
     <t-form label-align="top" style="padding: 0 2px">
@@ -168,12 +188,18 @@ onMounted(() => {
 .chatbot {
   height: 100%;
   display: flex;
+  box-sizing: border-box;
   padding: 0 24px 24px 24px;
+  overflow: hidden;
+
+  :deep(.t-chat-list) {
+    padding: 0 0 24px 0;
+  }
 }
 
 .aside-header {
   display: flex;
-  gap: 8px;
+  gap: 4px;
 
   .t-button:first-child {
     flex: 1;
