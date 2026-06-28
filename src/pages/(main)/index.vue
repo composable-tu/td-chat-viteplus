@@ -1,17 +1,20 @@
 <script lang="ts" setup>
-import { onMounted, ref, watch } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { ChatAddIcon, RefreshIcon } from "tdesign-icons-vue-next";
 import { MessagePlugin } from "tdesign-vue-next";
-import { Chatbot, type ChatMessagesData } from "@tdesign-vue-next/chat";
+import { Chatbot, type ChatRequestParams, type ChatServiceConfig } from "@tdesign-vue-next/chat";
 import {
   chatFirstApi,
   type ChatFirstRequest,
+  type ChatRequest,
   getAllThreadsApi,
   getChatHistoryApi,
   type InterviewThread,
+  type LangChainMessage,
 } from "@/api/interview";
 import { getResumeListApi, type ResumeOption } from "@/api/resume.ts";
+import { useAccountStore } from "@/stores/account.ts";
 
 const route = useRoute();
 const router = useRouter();
@@ -21,6 +24,48 @@ const activeThreadId = ref((route.query.chatId as string) || "");
 const threadsLoading = ref(false);
 const chatHistoryLoading = ref(false);
 const chatbotRef = ref<InstanceType<typeof Chatbot>>();
+const hasFinished = ref(false);
+const sendingMessage = ref(false);
+
+const chatServiceConfig = computed((): ChatServiceConfig | undefined => {
+  if (!activeThreadId.value) return undefined;
+  const userStore = useAccountStore();
+  return {
+    stream: false,
+    endpoint: `/api/interview/chat/${activeThreadId.value}`,
+    onRequest: (params: ChatRequestParams) => {
+      sendingMessage.value = true;
+      return {
+        body: JSON.stringify({ message: params.prompt } as ChatRequest),
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${userStore.token}`,
+        },
+      };
+    },
+    onComplete: (_aborted: boolean, _req, data) => {
+      sendingMessage.value = false;
+      const response = data?.data;
+      if (!response?.messages) return [];
+      hasFinished.value = !!response.has_finished;
+      const messages = response.messages;
+      const lastUserIdx = messages
+        .map((m: LangChainMessage) => m.role as string)
+        .lastIndexOf("human");
+      return messages.slice(lastUserIdx + 1).map((m: LangChainMessage) => {
+        if (m.role === "tool") {
+          return {
+            type: "thinking" as const,
+            data: { text: m.content, title: "工具调用" },
+            status: "complete" as const,
+            ext: { collapsed: true },
+          };
+        }
+        return { type: "text" as const, data: m.content };
+      });
+    },
+  };
+});
 
 const createNewChatVisible = ref(false);
 const chatCreating = ref(false);
@@ -61,6 +106,7 @@ const handleCreateChat = async () => {
   chatCreating.value = true;
   try {
     const res = await chatFirstApi(formData.value);
+    if (!res.data) throw new Error("创建失败：返回数据为空");
     MessagePlugin.success("新建成功");
     createNewChatVisible.value = false;
     activeThreadId.value = res.data.thread_id;
@@ -95,6 +141,13 @@ const formatTime = (dateStr: string) => {
   return `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 };
 
+const senderProps = computed(() => ({
+  disabled: hasFinished.value,
+  placeholder: hasFinished.value ? "当前面试已结束" : "请输入文本…",
+  loading: false,
+  sendBtnDisabled: sendingMessage.value,
+}));
+
 const fetchChatHistory = async (threadId: string) => {
   if (!threadId) {
     chatbotRef.value?.setMessages([], "replace");
@@ -103,6 +156,7 @@ const fetchChatHistory = async (threadId: string) => {
   chatHistoryLoading.value = true;
   try {
     const res = await getChatHistoryApi(threadId);
+    hasFinished.value = !!res.data?.has_finished;
     if (res.data?.messages) {
       chatbotRef.value?.setMessages(
         res.data.messages.map((msg, index) => ({
@@ -197,7 +251,14 @@ onMounted(() => {
         </t-menu>
       </t-aside>
       <t-layout>
-        <t-chatbot ref="chatbotRef" class="chatbot" :text-loading="chatHistoryLoading" />
+        <t-chatbot
+          :key="activeThreadId"
+          ref="chatbotRef"
+          :chat-service-config="chatServiceConfig"
+          :sender-props="senderProps"
+          :text-loading="chatHistoryLoading"
+          class="chatbot"
+        />
       </t-layout>
     </t-layout>
   </div>

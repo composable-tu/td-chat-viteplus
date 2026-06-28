@@ -33,6 +33,3 @@ export const getChatHistoryApi = (threadId: string) =>
 
 export const chatFirstApi = (data: ChatFirstRequest) =>
   alovaInstance.Post<BaseResponse<LangChainResponse>>("/interview/chatfirst", data);
-
-export const chatApi = (threadId: string, data: ChatRequest) =>
-  alovaInstance.Post<BaseResponse<LangChainResponse>>(`/interview/chat/${threadId}`, data);
