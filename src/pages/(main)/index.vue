@@ -3,10 +3,12 @@ import { onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { ChatAddIcon, RefreshIcon } from "tdesign-icons-vue-next";
 import { MessagePlugin } from "tdesign-vue-next";
+import { Chatbot, type ChatMessagesData } from "@tdesign-vue-next/chat";
 import {
   chatFirstApi,
   type ChatFirstRequest,
   getAllThreadsApi,
+  getChatHistoryApi,
   type InterviewThread,
 } from "@/api/interview";
 import { getResumeListApi, type ResumeOption } from "@/api/resume.ts";
@@ -17,6 +19,8 @@ const router = useRouter();
 const threads = ref<InterviewThread[]>([]);
 const activeThreadId = ref((route.query.chatId as string) || "");
 const threadsLoading = ref(false);
+const chatHistoryLoading = ref(false);
+const chatbotRef = ref<InstanceType<typeof Chatbot>>();
 
 const createNewChatVisible = ref(false);
 const chatCreating = ref(false);
@@ -91,6 +95,45 @@ const formatTime = (dateStr: string) => {
   return `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 };
 
+const fetchChatHistory = async (threadId: string) => {
+  if (!threadId) {
+    chatbotRef.value?.setMessages([], "replace");
+    return;
+  }
+  chatHistoryLoading.value = true;
+  try {
+    const res = await getChatHistoryApi(threadId);
+    if (res.data?.messages) {
+      chatbotRef.value?.setMessages(
+        res.data.messages.map((msg, index) => ({
+          role: (msg.role === "human"
+            ? "user"
+            : msg.role === "tool"
+              ? "assistant"
+              : "assistant") as "user" | "assistant",
+          content:
+            msg.role === "tool"
+              ? [
+                  {
+                    type: "thinking" as const,
+                    data: { text: msg.content, title: "工具调用" },
+                    status: "complete" as const,
+                    ext: { collapsed: true },
+                  },
+                ]
+              : [{ type: "text" as const, data: msg.content }],
+          id: `${threadId}-${index}`,
+        })),
+        "replace",
+      );
+    }
+  } catch {
+    MessagePlugin.error("获取对话历史失败");
+  } finally {
+    chatHistoryLoading.value = false;
+  }
+};
+
 // 对话线程 ID 映射到网址栏
 watch(activeThreadId, (id) => {
   const query = id ? { chatId: id } : {};
@@ -106,8 +149,15 @@ watch(
   },
 );
 
+watch(activeThreadId, (id) => {
+  fetchChatHistory(id);
+});
+
 onMounted(() => {
   fetchThreads();
+  if (activeThreadId.value) {
+    fetchChatHistory(activeThreadId.value);
+  }
 });
 </script>
 
@@ -147,7 +197,7 @@ onMounted(() => {
         </t-menu>
       </t-aside>
       <t-layout>
-        <t-chatbot class="chatbot" />
+        <t-chatbot ref="chatbotRef" class="chatbot" :text-loading="chatHistoryLoading" />
       </t-layout>
     </t-layout>
   </div>
