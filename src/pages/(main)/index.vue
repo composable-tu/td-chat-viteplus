@@ -3,7 +3,13 @@ import { computed, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { ChatAddIcon, RefreshIcon } from "tdesign-icons-vue-next";
 import { MessagePlugin } from "tdesign-vue-next";
-import { Chatbot, type ChatRequestParams, type ChatServiceConfig } from "@tdesign-vue-next/chat";
+import {
+  type AIMessageContent,
+  Chatbot,
+  type ChatRequestParams,
+  type ChatServiceConfig,
+  type SSEChunkData,
+} from "@tdesign-vue-next/chat";
 import {
   chatFirstApi,
   type ChatFirstRequest,
@@ -11,7 +17,6 @@ import {
   getAllThreadsApi,
   getChatHistoryApi,
   type InterviewThread,
-  type LangChainMessage,
 } from "@/api/interview";
 import { getResumeListApi, type ResumeOption } from "@/api/resume.ts";
 import { useAccountStore } from "@/stores/account.ts";
@@ -31,8 +36,8 @@ const chatServiceConfig = computed((): ChatServiceConfig | undefined => {
   if (!activeThreadId.value) return undefined;
   const userStore = useAccountStore();
   return {
-    stream: false,
-    endpoint: `/api/interview/chat/${activeThreadId.value}`,
+    stream: true,
+    endpoint: `/api/interview/chat-sse/${activeThreadId.value}`,
     onRequest: (params: ChatRequestParams) => {
       sendingMessage.value = true;
       return {
@@ -43,26 +48,43 @@ const chatServiceConfig = computed((): ChatServiceConfig | undefined => {
         },
       };
     },
-    onComplete: (_aborted: boolean, _req, data) => {
+    onMessage: (chunk: SSEChunkData): AIMessageContent | null => {
+      if (chunk.event === "done") {
+        chatbotRef.value?.abortChat();
+        return null;
+      }
+
+      const { type, data, ...rest } = chunk.data as any;
+
+      // 根据不同的事件类型，返回不同的内容块
+      switch (type) {
+        case "messages":
+          const _data = (data as Array<any>)[0];
+          if (_data.type === "AIMessageChunk")
+            return {
+              type: "markdown",
+              data: _data?.content || "",
+              strategy: "merge",
+            };
+          else if (_data.type === "tool")
+            return {
+              type: "thinking",
+              data: { text: _data?.content || "", title: "工具调用" },
+              status: "complete",
+              ext: { collapsed: true },
+              strategy: "merge",
+            };
+
+        // 忽略其他类型的事件
+        default:
+          return null;
+      }
+    },
+    onComplete: (_aborted: boolean, _req, _) => {
+      setTimeout(() => {
+        fetchChatHistory(activeThreadId.value);
+      }, 1000);
       sendingMessage.value = false;
-      const response = data?.data;
-      if (!response?.messages) return [];
-      hasFinished.value = !!response.has_finished;
-      const messages = response.messages;
-      const lastUserIdx = messages
-        .map((m: LangChainMessage) => m.role as string)
-        .lastIndexOf("human");
-      return messages.slice(lastUserIdx + 1).map((m: LangChainMessage) => {
-        if (m.role === "tool") {
-          return {
-            type: "thinking" as const,
-            data: { text: m.content, title: "工具调用" },
-            status: "complete" as const,
-            ext: { collapsed: true },
-          };
-        }
-        return { type: "text" as const, data: m.content };
-      });
     },
   };
 });
@@ -169,13 +191,14 @@ const fetchChatHistory = async (threadId: string) => {
             msg.role === "tool"
               ? [
                   {
-                    type: "thinking" as const,
+                    type: "thinking",
                     data: { text: msg.content, title: "工具调用" },
-                    status: "complete" as const,
+                    status: "complete",
                     ext: { collapsed: true },
+                    strategy: "merge",
                   },
                 ]
-              : [{ type: "text" as const, data: msg.content }],
+              : [{ type: "text", data: msg.content, strategy: "merge" }],
           id: `${threadId}-${index}`,
         })),
         "replace",
