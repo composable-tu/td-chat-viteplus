@@ -26,7 +26,7 @@ export interface ChatRequest {
 }
 
 export const getAllThreadsApi = () =>
-  alovaInstance.Post<BaseResponse<InterviewThread[]>>("/interview/allThreads");
+  alovaInstance.Get<BaseResponse<InterviewThread[]>>("/interview/allThreads");
 
 export const getChatHistoryApi = (threadId: string) =>
   alovaInstance.Get<BaseResponse<LangChainResponse>>(`/interview/history/${threadId}`);
