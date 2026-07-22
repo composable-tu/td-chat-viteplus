@@ -3,6 +3,7 @@ import { computed, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { ChatAddIcon, RefreshIcon } from "tdesign-icons-vue-next";
 import { MessagePlugin } from "tdesign-vue-next";
+import { useRequest } from "alova/client";
 import {
   type AIMessageContent,
   Chatbot,
@@ -26,8 +27,6 @@ const router = useRouter();
 
 const threads = ref<InterviewThread[]>([]);
 const activeThreadId = ref((route.query.chatId as string) || "");
-const threadsLoading = ref(false);
-const chatHistoryLoading = ref(false);
 const chatbotRef = ref<InstanceType<typeof Chatbot>>();
 const hasFinished = ref(false);
 const sendingMessage = ref(false);
@@ -90,7 +89,6 @@ const chatServiceConfig = computed((): ChatServiceConfig | undefined => {
 });
 
 const createNewChatVisible = ref(false);
-const chatCreating = ref(false);
 const resumeList = ref<ResumeOption[]>([]);
 
 const formData = ref<ChatFirstRequest>({
@@ -104,58 +102,81 @@ const interviewTypeOptions = [
   { label: "公务员", value: "CIVIL_SERVICE" },
 ];
 
-const fetchResumeList = async () => {
-  chatCreating.value = true;
-  try {
-    const res = await getResumeListApi();
-    resumeList.value = (res.data || []).map((r) => ({ id: r.id, name: r.name }));
-  } catch (e: any) {
-    MessagePlugin.error("获取简历列表失败");
-  } finally {
-    chatCreating.value = false;
-  }
-};
-
-watch(createNewChatVisible, (visible) => {
-  if (visible) fetchResumeList();
+const {
+  loading: threadsLoading,
+  send: sendThreads,
+  onSuccess: onThreadsSuccess,
+  onError: onThreadsError,
+} = useRequest(() => getAllThreadsApi(), {
+  immediate: false,
 });
 
-const handleCreateChat = async () => {
+onThreadsSuccess(({ data: res }) => {
+  threads.value = (res.data || []).sort(
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+  );
+});
+
+onThreadsError(() => {
+  MessagePlugin.error("获取对话列表失败");
+});
+
+const {
+  loading: resumeListLoading,
+  send: sendResumeList,
+  onSuccess: onResumeSuccess,
+  onError: onResumeError,
+} = useRequest(() => getResumeListApi(), {
+  immediate: false,
+});
+
+onResumeSuccess(({ data: res }) => {
+  resumeList.value = (res.data || []).map((r) => ({ id: r.id, name: r.name }));
+});
+
+onResumeError(() => {
+  MessagePlugin.error("获取简历列表失败");
+});
+
+const {
+  loading: chatCreating,
+  send: sendCreateChat,
+  onSuccess: onCreateSuccess,
+  onError: onCreateError,
+  onComplete: onCreateComplete,
+} = useRequest((data: ChatFirstRequest) => chatFirstApi(data), {
+  immediate: false,
+});
+
+onCreateSuccess(({ data: res }) => {
+  if (!res.data) throw new Error("创建失败：返回数据为空");
+  MessagePlugin.success("新建成功");
+  createNewChatVisible.value = false;
+  activeThreadId.value = res.data.thread_id;
+});
+
+onCreateError((e) => {
+  MessagePlugin.error(e.error?.message || "新建失败");
+});
+
+onCreateComplete(() => {
+  sendThreads();
+});
+
+watch(createNewChatVisible, (visible) => {
+  if (visible) sendResumeList();
+});
+
+const handleCreateChat = () => {
   if (!formData.value.resume_id) {
     MessagePlugin.warning("请选择简历");
     return;
   }
-  chatCreating.value = true;
-  try {
-    const res = await chatFirstApi(formData.value);
-    if (!res.data) throw new Error("创建失败：返回数据为空");
-    MessagePlugin.success("新建成功");
-    createNewChatVisible.value = false;
-    activeThreadId.value = res.data.thread_id;
-  } catch (e: any) {
-    MessagePlugin.error(e.message || "新建失败");
-  } finally {
-    chatCreating.value = false;
-    fetchThreads();
-  }
+  sendCreateChat(formData.value);
 };
 
 const handleDialogClose = () => {
   formData.value = { resume_id: undefined as unknown as number, interviewType: "TECH" };
-};
-
-const fetchThreads = async () => {
-  threadsLoading.value = true;
-  try {
-    const res = await getAllThreadsApi();
-    threads.value = (res.data || []).sort(
-      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-    );
-  } catch {
-    MessagePlugin.error("获取对话列表失败");
-  } finally {
-    threadsLoading.value = false;
-  }
 };
 
 const formatTime = (dateStr: string) => {
@@ -170,45 +191,53 @@ const senderProps = computed(() => ({
   sendBtnDisabled: sendingMessage.value,
 }));
 
-const fetchChatHistory = async (threadId: string) => {
+const {
+  loading: chatHistoryLoading,
+  send: sendChatHistory,
+  onSuccess: onHistorySuccess,
+  onError: onHistoryError,
+} = useRequest((threadId: string) => getChatHistoryApi(threadId), {
+  immediate: false,
+});
+
+onHistorySuccess(({ data: res, args }) => {
+  const threadId = args[0];
+  hasFinished.value = !!res.data?.has_finished;
+  if (res.data?.messages) {
+    chatbotRef.value?.setMessages(
+      res.data.messages.map((msg, index) => ({
+        role: (msg.role === "human" ? "user" : msg.role === "tool" ? "assistant" : "assistant") as
+          | "user"
+          | "assistant",
+        content:
+          msg.role === "tool"
+            ? [
+                {
+                  type: "thinking",
+                  data: { text: msg.content, title: "工具调用" },
+                  status: "complete",
+                  ext: { collapsed: true },
+                  strategy: "merge",
+                },
+              ]
+            : [{ type: "text", data: msg.content, strategy: "merge" }],
+        id: `${threadId}-${index}`,
+      })),
+      "replace",
+    );
+  }
+});
+
+onHistoryError(() => {
+  MessagePlugin.error("获取对话历史失败");
+});
+
+const fetchChatHistory = (threadId: string) => {
   if (!threadId) {
     chatbotRef.value?.setMessages([], "replace");
     return;
   }
-  chatHistoryLoading.value = true;
-  try {
-    const res = await getChatHistoryApi(threadId);
-    hasFinished.value = !!res.data?.has_finished;
-    if (res.data?.messages) {
-      chatbotRef.value?.setMessages(
-        res.data.messages.map((msg, index) => ({
-          role: (msg.role === "human"
-            ? "user"
-            : msg.role === "tool"
-              ? "assistant"
-              : "assistant") as "user" | "assistant",
-          content:
-            msg.role === "tool"
-              ? [
-                  {
-                    type: "thinking",
-                    data: { text: msg.content, title: "工具调用" },
-                    status: "complete",
-                    ext: { collapsed: true },
-                    strategy: "merge",
-                  },
-                ]
-              : [{ type: "text", data: msg.content, strategy: "merge" }],
-          id: `${threadId}-${index}`,
-        })),
-        "replace",
-      );
-    }
-  } catch {
-    MessagePlugin.error("获取对话历史失败");
-  } finally {
-    chatHistoryLoading.value = false;
-  }
+  sendChatHistory(threadId);
 };
 
 // 对话线程 ID 映射到网址栏
@@ -231,7 +260,7 @@ watch(activeThreadId, (id) => {
 });
 
 onMounted(() => {
-  fetchThreads();
+  sendThreads();
   if (activeThreadId.value) {
     fetchChatHistory(activeThreadId.value);
   }
@@ -256,7 +285,7 @@ onMounted(() => {
               shape="square"
               theme="primary"
               variant="outline"
-              @click="fetchThreads"
+              @click="sendThreads()"
             >
               <template v-if="!threadsLoading" #icon>
                 <refresh-icon />
@@ -301,8 +330,8 @@ onMounted(() => {
       <t-form-item label="选择简历">
         <t-select
           v-model="formData.resume_id"
-          :disabled="chatCreating"
-          :loading="chatCreating"
+          :disabled="resumeListLoading"
+          :loading="resumeListLoading"
           :options="resumeList.map((r) => ({ label: r.name, value: r.id }))"
           :placeholder="resumeList.length > 0 ? '请选择简历' : '请先在简历管理页上传简历'"
           style="width: 100%"
